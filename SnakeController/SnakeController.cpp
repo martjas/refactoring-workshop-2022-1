@@ -63,9 +63,9 @@ Controller::Controller(IPort& p_displayPort, IPort& p_foodPort, IPort& p_scorePo
     }
 }
 
-bool Controller::snakeAteItself(int xHead, int yHead){
+bool Controller::snakeAteItself(const Segment & newHead){
     for (auto segment : m_segments) {
-            if (segment.x == xHead and segment.y == yHead) {
+            if (segment.x == newHead.x and segment.y == newHead.y) {
                 m_scorePort.send(std::make_unique<EventT<LooseInd>>());
                 return true;
             }
@@ -73,16 +73,16 @@ bool Controller::snakeAteItself(int xHead, int yHead){
     return false;
 }
 
-bool Controller::snakeIsOutOfBounds(int xHead, int yHead){
-    if (xHead < 0 or yHead < 0 or xHead >= m_mapDimension.first or yHead >= m_mapDimension.second) {
+bool Controller::snakeIsOutOfBounds(const Segment & newHead){
+    if (newHead.x < 0 or newHead.y < 0 or newHead.x >= m_mapDimension.first or newHead.y >= m_mapDimension.second) {
         m_scorePort.send(std::make_unique<EventT<LooseInd>>());
         return true;
     }
     return false;
 
 }
-bool Controller::snakeAteFood(int xHead, int yHead){
-    if(std::make_pair(xHead, yHead) == m_foodPosition) {
+bool Controller::snakeAteFood(const Segment & newHead){
+    if(std::make_pair(newHead.x, newHead.y) == m_foodPosition) {
         m_scorePort.send(std::make_unique<EventT<ScoreInd>>());
         m_foodPort.send(std::make_unique<EventT<FoodReq>>());
         return true;
@@ -90,7 +90,7 @@ bool Controller::snakeAteFood(int xHead, int yHead){
     return false;
 }
 
-void Controller::updateTail(){
+void Controller::updateEndTail(){
     for (auto &segment : m_segments) {
         if (not --segment.ttl) {
             DisplayInd l_evt;
@@ -100,6 +100,24 @@ void Controller::updateTail(){
             m_displayPort.send(std::make_unique<EventT<DisplayInd>>(l_evt));
         }
     }
+}
+
+void Controller::updateSnake(const Segment & newHead){
+    m_segments.push_front(newHead);
+    DisplayInd placeNewHead;
+    placeNewHead.x = newHead.x;
+    placeNewHead.y = newHead.y;
+    placeNewHead.value = Cell_SNAKE;
+
+    m_displayPort.send(std::make_unique<EventT<DisplayInd>>(placeNewHead));
+
+    m_segments.erase(
+        std::remove_if(
+            m_segments.begin(),
+            m_segments.end(),
+            [](auto const& segment){ return not (segment.ttl > 0); }),
+        m_segments.end());
+
 }
 
 void Controller::receive(std::unique_ptr<Event> e)
@@ -114,31 +132,19 @@ void Controller::receive(std::unique_ptr<Event> e)
         newHead.y = currentHead.y + (not (m_currentDirection & 0b01) ? (m_currentDirection & 0b10) ? 1 : -1 : 0);
         newHead.ttl = currentHead.ttl;
 
-        bool lost = snakeAteItself(newHead.x, newHead.y);
+        bool lost = snakeAteItself(newHead);
 
-        if (not lost and not snakeAteFood(newHead.x, newHead.y)) {
-            if (snakeIsOutOfBounds(newHead.x, newHead.y)) {
+        if (not lost and not snakeAteFood(newHead)) {
+            if (snakeIsOutOfBounds(newHead)) {
                 lost = true;
-            } else updateTail();
+            } else updateEndTail();
         }
 
 
         if (not lost) {
-            m_segments.push_front(newHead);
-            DisplayInd placeNewHead;
-            placeNewHead.x = newHead.x;
-            placeNewHead.y = newHead.y;
-            placeNewHead.value = Cell_SNAKE;
-
-            m_displayPort.send(std::make_unique<EventT<DisplayInd>>(placeNewHead));
-
-            m_segments.erase(
-                std::remove_if(
-                    m_segments.begin(),
-                    m_segments.end(),
-                    [](auto const& segment){ return not (segment.ttl > 0); }),
-                m_segments.end());
+            updateSnake(newHead);
         }
+
     } catch (std::bad_cast&) {
         try {
             auto direction = dynamic_cast<EventT<DirectionInd> const&>(*e)->direction;

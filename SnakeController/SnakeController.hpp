@@ -30,10 +30,9 @@ public:
     Controller(Controller const& p_rhs) = delete;
     Controller& operator=(Controller const& p_rhs) = delete;
 
-    bool snakeAteItself(int xHead, int yHead);
-    bool snakeIsOutOfBounds(int xHead, int yHead);
-    bool snakeAteFood(int xHead, int yHead);
-    void updateTail();
+
+    
+    
     void receive(std::unique_ptr<Event> e) override;
 
 private:
@@ -43,6 +42,11 @@ private:
         int y;
         int ttl;
     };
+    bool snakeAteFood(const Segment & s);
+    void updateEndTail();
+    void updateSnake(const Segment & s);
+    bool snakeAteItself(const Segment & s);
+    bool snakeIsOutOfBounds(const Segment & s);
 
     IPort& m_displayPort;
     IPort& m_foodPort;
