@@ -30,6 +30,7 @@ public:
     Controller(Controller const& p_rhs) = delete;
     Controller& operator=(Controller const& p_rhs) = delete;
 
+    bool snakeAteItself(int x, int y);
     void receive(std::unique_ptr<Event> e) override;
 
 private:
