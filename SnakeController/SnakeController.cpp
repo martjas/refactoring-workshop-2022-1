@@ -74,7 +74,32 @@ bool Controller::snakeAteItself(int xHead, int yHead){
 }
 
 bool Controller::snakeIsOutOfBounds(int xHead, int yHead){
-    return xHead < 0 or yHead < 0 or xHead >= m_mapDimension.first or yHead >= m_mapDimension.second;
+    if (xHead < 0 or yHead < 0 or xHead >= m_mapDimension.first or yHead >= m_mapDimension.second) {
+        m_scorePort.send(std::make_unique<EventT<LooseInd>>());
+        return true;
+    }
+    return false;
+
+}
+bool Controller::snakeAteFood(int xHead, int yHead){
+    if(std::make_pair(xHead, yHead) == m_foodPosition) {
+        m_scorePort.send(std::make_unique<EventT<ScoreInd>>());
+        m_foodPort.send(std::make_unique<EventT<FoodReq>>());
+        return true;
+    }
+    return false;
+}
+
+void Controller::updateTail(){
+    for (auto &segment : m_segments) {
+        if (not --segment.ttl) {
+            DisplayInd l_evt;
+            l_evt.x = segment.x;
+            l_evt.y = segment.y;
+            l_evt.value = Cell_FREE;
+            m_displayPort.send(std::make_unique<EventT<DisplayInd>>(l_evt));
+        }
+    }
 }
 
 void Controller::receive(std::unique_ptr<Event> e)
@@ -91,27 +116,12 @@ void Controller::receive(std::unique_ptr<Event> e)
 
         bool lost = snakeAteItself(newHead.x, newHead.y);
 
-
-        if (not lost) {
-            if (std::make_pair(newHead.x, newHead.y) == m_foodPosition) {
-                m_scorePort.send(std::make_unique<EventT<ScoreInd>>());
-                m_foodPort.send(std::make_unique<EventT<FoodReq>>());
-            } else if (snakeIsOutOfBounds(newHead.x, newHead.y)) {
-                m_scorePort.send(std::make_unique<EventT<LooseInd>>());
+        if (not lost and not snakeAteFood(newHead.x, newHead.y)) {
+            if (snakeIsOutOfBounds(newHead.x, newHead.y)) {
                 lost = true;
-            } else {
-                for (auto &segment : m_segments) {
-                    if (not --segment.ttl) {
-                        DisplayInd l_evt;
-                        l_evt.x = segment.x;
-                        l_evt.y = segment.y;
-                        l_evt.value = Cell_FREE;
-
-                        m_displayPort.send(std::make_unique<EventT<DisplayInd>>(l_evt));
-                    }
-                }
-            }
+            } else updateTail();
         }
+
 
         if (not lost) {
             m_segments.push_front(newHead);

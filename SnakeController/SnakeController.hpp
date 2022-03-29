@@ -32,6 +32,8 @@ public:
 
     bool snakeAteItself(int xHead, int yHead);
     bool snakeIsOutOfBounds(int xHead, int yHead);
+    bool snakeAteFood(int xHead, int yHead);
+    void updateTail();
     void receive(std::unique_ptr<Event> e) override;
 
 private:
