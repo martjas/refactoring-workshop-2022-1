@@ -73,6 +73,10 @@ bool Controller::snakeAteItself(int xHead, int yHead){
     return false;
 }
 
+bool Controller::snakeIsOutOfBounds(int xHead, int yHead){
+    return xHead < 0 or yHead < 0 or xHead >= m_mapDimension.first or yHead >= m_mapDimension.second;
+}
+
 void Controller::receive(std::unique_ptr<Event> e)
 {
     try {
@@ -85,25 +89,14 @@ void Controller::receive(std::unique_ptr<Event> e)
         newHead.y = currentHead.y + (not (m_currentDirection & 0b01) ? (m_currentDirection & 0b10) ? 1 : -1 : 0);
         newHead.ttl = currentHead.ttl;
 
-        //bool lost = false;
-
         bool lost = snakeAteItself(newHead.x, newHead.y);
 
-        // for (auto segment : m_segments) {
-        //     if (segment.x == newHead.x and segment.y == newHead.y) {
-        //         m_scorePort.send(std::make_unique<EventT<LooseInd>>());
-        //         lost = true;
-        //         break;
-        //     }
-        // }
 
         if (not lost) {
             if (std::make_pair(newHead.x, newHead.y) == m_foodPosition) {
                 m_scorePort.send(std::make_unique<EventT<ScoreInd>>());
                 m_foodPort.send(std::make_unique<EventT<FoodReq>>());
-            } else if (newHead.x < 0 or newHead.y < 0 or
-                       newHead.x >= m_mapDimension.first or
-                       newHead.y >= m_mapDimension.second) {
+            } else if (snakeIsOutOfBounds(newHead.x, newHead.y)) {
                 m_scorePort.send(std::make_unique<EventT<LooseInd>>());
                 lost = true;
             } else {
